@@ -1,16 +1,6 @@
 from fastapi import FastAPI
-from app.core.config import settings
+from app.api.routes.users import router as users_router
 
-app = FastAPI(
-    title="AI Knowledge Assistant API",
-    version="1.0.0"
-)
+app = FastAPI()
 
-@app.get("/")
-def root():
-    return {
-        "message": "AI Knowledge Assistant API is running"
-    }
-
-
-print(settings.database_url)
+app.include_router(users_router)
