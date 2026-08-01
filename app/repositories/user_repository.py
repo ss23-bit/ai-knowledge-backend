@@ -1,8 +1,14 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from _collections_abc import Sequence
 
 from app.models.user import User
+
+SORT_FIELD = {
+    "id": User.id,
+    "email": User.email,
+    "full_name": User.full_name,
+}
 
 def create_user(
         db: Session,
@@ -43,12 +49,72 @@ def get_user_by_id(
 
 def get_all_users(
         db: Session,
-) -> Sequence[User]:
-    
-    stmt = select(User)
+        limit: int,
+        offset: int,
+        search: str | None,
+        sort: str | None,
+) -> tuple[Sequence[User], int]:
+    # DRY, building conditions for reusable quries.
+    filters = []
+
+    if search:
+        filters.append(
+                # ilike is Case-insensitive LIKE
+                User.full_name.ilike(f"%{search}%")
+        )
+
+    stmt = (
+        select(User)
+    )
+
+    count_stmt = (
+        select(func.count()).select_from(User)
+    )
+
+
+    if filters:
+        stmt = (
+            stmt
+            .where(*filters)
+        )
+
+    if filters:
+        count_stmt = (
+            count_stmt.where(*filters)
+        )
+
+    if sort:
+        descending = sort.startswith("-")
+        sort_field = sort.removeprefix("-")
+
+        column = SORT_FIELD.get(sort_field)
+        if column is None:
+            raise ValueError(f"Invalid sort field: {sort_field}")
+
+        if descending:
+            stmt = (
+                stmt
+                .order_by(column.desc())
+            )
+        else:
+            stmt = (
+                stmt
+                .order_by(column)
+            )             
+
+    stmt = (
+        stmt
+        .limit(limit)
+        .offset(offset)
+    )
 
     # collec them into python list, but SQLAlchemy telling it'll be Sequence.
-    return db.scalars(stmt).all()
+    users = db.scalars(stmt).all()
+
+    total = db.scalar(count_stmt) or 0
+
+    # Python will return the values as tuple
+    return users, total
 
 def update_user(
         db: Session,

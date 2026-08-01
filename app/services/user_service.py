@@ -29,10 +29,18 @@ def find_user_by_id(
 
 def list_users(
         db: Session,
-) -> Sequence[User]:
+        limit: int,
+        offset: int,
+        search: str | None,
+        sort: str | None,
+) -> tuple[Sequence[User], int]:
 
     return get_all_users(
-        db=db
+        db=db,
+        limit=limit,
+        offset=offset,
+        search=search,
+        sort=sort,
     )
 
 def update_user_name(

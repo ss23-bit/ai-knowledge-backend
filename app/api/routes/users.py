@@ -1,12 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Annotated
 
 from app.api.dependencies import get_db
-from app.schemas.user_schema import UserCreate, UserResponse, UserUpdate
-from app.services.user_service import register_user, find_user_by_id, list_users, update_user_name, delete_user_by_id
+from app.schemas.user_schema import (
+    UserCreate, 
+    UserResponse, 
+    UserUpdate, 
+    UserListResponse,
+)
+from app.services.user_service import (
+    register_user, 
+    find_user_by_id, 
+    list_users, 
+    update_user_name, 
+    delete_user_by_id,
+)
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+def user_not_found():
+    raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
 
 @router.post(
     "",
@@ -40,26 +57,46 @@ def get_user(
     )
 
     if user is None:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
+        user_not_found()
 
     return user
 
 @router.get(
         "",
-        response_model=List[UserResponse],
+        response_model=UserListResponse,
 )
 
 def get_users(
-    db: Session = Depends(get_db)
+    # limit, offset and search is Query Parameter. It's not in the url path and not pydantic model, so FastAPI assume it is QP. 
+    # Annotated attaching extra metadata. "Annotated[TYPE, EXTRA_INFORMATION]"
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    # = None making Search Optional without it there's no default value and it will raise an error because python required a value.
+    search: str | None = None,
+    sort: str | None = None,
+    db: Session = Depends(get_db),
 ):
+    try:
+        users, total = list_users(
+            db=db,
+            limit=limit,
+            offset=offset,
+            search=search,
+            sort=sort,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=e,
+        )
 
-    # If collection resource is empty it'll return [] because it exist, unlike /users/1 that return None
-    return list_users(
-        db=db
-    )
+    # The API response object, it includes metadata.
+    return {
+        "items": users,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 @router.put(
     "/{user_id}",
@@ -78,10 +115,7 @@ def update_user_endpoint(
     )
 
     if user is None:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
+        user_not_found()
 
     return user
 

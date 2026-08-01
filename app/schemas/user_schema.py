@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from _collections_abc import Sequence
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -16,3 +17,9 @@ class UserResponse(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: str
+
+class UserListResponse(BaseModel):
+    items: Sequence[UserResponse]
+    total: int
+    limit: int
+    offset: int
